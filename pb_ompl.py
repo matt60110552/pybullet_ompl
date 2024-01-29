@@ -14,13 +14,18 @@ except ImportError:
     from ompl import base as ob
     from ompl import geometric as og
 import pybullet as p
-import utils
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+import pb_ompl_utils
 import time
 from itertools import product
 import copy
 
-INTERPOLATE_NUM = 500
-DEFAULT_PLANNING_TIME = 5.0
+# INTERPOLATE_NUM = 500
+INTERPOLATE_NUM = 30
+# DEFAULT_PLANNING_TIME = 5.0
+DEFAULT_PLANNING_TIME = 2.0
 
 class PbOMPLRobot():
     '''
@@ -30,20 +35,24 @@ class PbOMPLRobot():
     This parent class by default assumes that all joints are acutated and should be planned. If this is not your desired
     behaviour, please write your own inheritated class that overrides respective functionalities.
     '''
-    def __init__(self, id) -> None:
+    def __init__(self, id, joint_id=None, init_joint=None) -> None:
         # Public attributes
         self.id = id
 
-        # prune fixed joints
-        all_joint_num = p.getNumJoints(id)
-        all_joint_idx = list(range(all_joint_num))
-        joint_idx = [j for j in all_joint_idx if self._is_not_fixed(j)]
-        self.num_dim = len(joint_idx)
-        self.joint_idx = joint_idx
-        print(self.joint_idx)
+        if joint_id is None:
+            # prune fixed joints
+            all_joint_num = p.getNumJoints(id)
+            all_joint_idx = list(range(all_joint_num))
+            joint_idx = [j for j in all_joint_idx if self._is_not_fixed(j)]
+            self.num_dim = len(joint_idx)
+            self.joint_idx = joint_idx
+            print(self.joint_idx)
+        else:
+            self.num_dim = len(joint_id)
+            self.joint_idx = joint_id
+            print(self.joint_idx)
         self.joint_bounds = []
-
-        self.reset()
+        self.reset(init_state=init_joint)
 
     def _is_not_fixed(self, joint_idx):
         joint_info = p.getJointInfo(self.id, joint_idx)
@@ -76,15 +85,16 @@ class PbOMPLRobot():
         self._set_joint_positions(self.joint_idx, state)
         self.state = state
 
-    def reset(self):
+    def reset(self, init_state=[-0.15, -1.55, 1.8, -0.1, 1.8, 0.0, 0.0, 0.0, 0.0]):
         '''
         Reset robot state
         Args:
             state: list[Float], joint values of robot
         '''
-        state = [0] * self.num_dim
-        self._set_joint_positions(self.joint_idx, state)
-        self.state = state
+        # state = [0] * self.num_dim
+        # state = [-0.08, -1.25, 1.9, -0.1, 1.571, 0.0]
+        self._set_joint_positions(self.joint_idx, init_state)
+        self.state = init_state
 
     def _set_joint_positions(self, joints, positions):
         for joint, value in zip(joints, positions):
@@ -142,7 +152,7 @@ class PbOMPL():
         #                                                 custom_limits={}, max_distance=0, allow_collision_links=[])
 
         self.set_obstacles(obstacles)
-        self.set_planner("RRT") # RRT by default
+        self.set_planner("PRM") # RRT by default
 
     def set_obstacles(self, obstacles):
         self.obstacles = obstacles
@@ -163,22 +173,22 @@ class PbOMPL():
         # check self-collision
         self.robot.set_state(self.state_to_list(state))
         for link1, link2 in self.check_link_pairs:
-            if utils.pairwise_link_collision(self.robot_id, link1, self.robot_id, link2):
+            if pb_ompl_utils.pairwise_link_collision(self.robot_id, link1, self.robot_id, link2):
                 # print(get_body_name(body), get_link_name(body, link1), get_link_name(body, link2))
                 return False
 
         # check collision against environment
         for body1, body2 in self.check_body_pairs:
-            if utils.pairwise_collision(body1, body2):
+            if pb_ompl_utils.pairwise_collision(body1, body2):
                 # print('body collision', body1, body2)
                 # print(get_body_name(body1), get_body_name(body2))
                 return False
         return True
 
     def setup_collision_detection(self, robot, obstacles, self_collisions = True, allow_collision_links = []):
-        self.check_link_pairs = utils.get_self_link_pairs(robot.id, robot.joint_idx) if self_collisions else []
+        self.check_link_pairs = pb_ompl_utils.get_self_link_pairs(robot.id, robot.joint_idx) if self_collisions else []
         moving_links = frozenset(
-            [item for item in utils.get_moving_links(robot.id, robot.joint_idx) if not item in allow_collision_links])
+            [item for item in pb_ompl_utils.get_moving_links(robot.id, robot.joint_idx) if not item in allow_collision_links])
         moving_bodies = [(robot.id, moving_links)]
         self.check_body_pairs = list(product(moving_bodies, obstacles))
 
