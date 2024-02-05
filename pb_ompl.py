@@ -254,7 +254,7 @@ class PbOMPL():
             for sol_path in sol_path_list:
                 self.is_state_valid(sol_path)
                 sol_elbow_pos_list.append(p.getLinkState(self.robot_id, 5)[4])
-                sol_gripper_pos_list.append(p.getLinkState(self.robot_id, 7)[4])
+                sol_gripper_pos_list.append(p.getLinkState(self.robot_id, 7)[4]) # 7 is the num for gripper
                 sol_gripper_orn_list.append(p.getLinkState(self.robot_id, 7)[5])
             res = True
         else:
