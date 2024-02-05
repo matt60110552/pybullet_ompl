@@ -124,7 +124,7 @@ class PbStateSpace(ob.RealVectorStateSpace):
         self.state_sampler = state_sampler
 
 class PbOMPL():
-    def __init__(self, robot, obstacles = []) -> None:
+    def __init__(self, robot, obstacles = [], joint_bounds=None) -> None:
         '''
         Args
             robot: A PbOMPLRobot instance.
@@ -138,7 +138,8 @@ class PbOMPL():
         self.space = PbStateSpace(robot.num_dim)
 
         bounds = ob.RealVectorBounds(robot.num_dim)
-        joint_bounds = self.robot.get_joint_bounds()
+        if joint_bounds is None:
+            joint_bounds = self.robot.get_joint_bounds()
         for i, bound in enumerate(joint_bounds):
             bounds.setLow(i, bound[0])
             bounds.setHigh(i, bound[1])
@@ -216,7 +217,7 @@ class PbOMPL():
 
         self.ss.setPlanner(self.planner)
 
-    def plan_start_goal(self, start, goal, allowed_time = DEFAULT_PLANNING_TIME):
+    def plan_start_goal(self, start, goal, allowed_time = DEFAULT_PLANNING_TIME, interpolate_num=INTERPOLATE_NUM):
         '''
         plan a path to gaol from the given robot start state
         '''
@@ -238,31 +239,37 @@ class PbOMPL():
         solved = self.ss.solve(allowed_time)
         res = False
         sol_path_list = []
+        sol_elbow_pos_list = []
+        sol_gripper_pos_list = []
+        sol_gripper_orn_list = []
         if solved:
-            print("Found solution: interpolating into {} segments".format(INTERPOLATE_NUM))
+            print("Found solution: interpolating into {} segments".format(interpolate_num))
             # print the path to screen
             sol_path_geometric = self.ss.getSolutionPath()
-            sol_path_geometric.interpolate(INTERPOLATE_NUM)
+            sol_path_geometric.interpolate(interpolate_num)
             sol_path_states = sol_path_geometric.getStates()
             sol_path_list = [self.state_to_list(state) for state in sol_path_states]
             # print(len(sol_path_list))
             # print(sol_path_list)
             for sol_path in sol_path_list:
                 self.is_state_valid(sol_path)
+                sol_elbow_pos_list.append(p.getLinkState(self.robot_id, 5)[4])
+                sol_gripper_pos_list.append(p.getLinkState(self.robot_id, 7)[4])
+                sol_gripper_orn_list.append(p.getLinkState(self.robot_id, 7)[5])
             res = True
         else:
             print("No solution found")
 
         # reset robot state
         self.robot.set_state(orig_robot_state)
-        return res, sol_path_list
+        return res, sol_path_list, sol_elbow_pos_list, sol_gripper_pos_list, sol_gripper_orn_list
 
-    def plan(self, goal, allowed_time = DEFAULT_PLANNING_TIME):
+    def plan(self, goal, allowed_time = DEFAULT_PLANNING_TIME, interpolate_num=INTERPOLATE_NUM):
         '''
         plan a path to gaol from current robot state
         '''
         start = self.robot.get_cur_state()
-        return self.plan_start_goal(start, goal, allowed_time=allowed_time)
+        return self.plan_start_goal(start, goal, allowed_time=allowed_time, interpolate_num=interpolate_num)
 
     def execute(self, path, dynamics=False):
         '''
