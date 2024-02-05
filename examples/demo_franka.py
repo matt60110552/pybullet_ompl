@@ -20,6 +20,7 @@ class BoxDemo():
 
         # load robot
         robot_id = p.loadURDF("models/franka_description/robots/panda_arm.urdf", (0,0,0), useFixedBase = 1)
+        # robot_id = p.loadURDF("models/tm5_900/tm5_900_with_gripper.urdf", (0,0,0), useFixedBase = 1)
         robot = pb_ompl.PbOMPLRobot(robot_id)
         self.robot = robot
 
