@@ -8,6 +8,7 @@ from __future__ import print_function
 import pybullet as p
 from collections import defaultdict, deque, namedtuple
 from itertools import product, combinations, count
+import numpy as np
 
 BASE_LINK = -1
 MAX_DISTANCE = 0.
@@ -156,4 +157,13 @@ def get_link_subtree(body, link, **kwargs):
 def are_links_adjacent(body, link1, link2):
     return (get_link_parent(body, link1) == link2) or \
            (get_link_parent(body, link2) == link1)
+
+def approaching(state, goal_state, state_mat, goal_mat):
+    dist_vec = state_mat[:3, 3] - goal_mat[:3, 3]
+    dist_vec /= np.linalg.norm(dist_vec)
+    # print(f"dist_vec: {dist_vec}")
+    if np.linalg.norm(dist_vec) < 0.07:
+        if np.dot(dist_vec, goal_mat[:3, 2]) > -0.1 or np.dot(state_mat[:3, 1], goal_mat[:3, 1]) < 0.3:
+            return True
+    return False
 

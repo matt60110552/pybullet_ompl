@@ -21,11 +21,13 @@ import pb_ompl_utils
 import time
 from itertools import product
 import copy
+import numpy as np
+from utils.utils import *
 
 # INTERPOLATE_NUM = 500
 INTERPOLATE_NUM = 30
-# DEFAULT_PLANNING_TIME = 5.0
-DEFAULT_PLANNING_TIME = 2.0
+DEFAULT_PLANNING_TIME = 5.0
+# DEFAULT_PLANNING_TIME = 2.0
 
 class PbOMPLRobot():
     '''
@@ -133,6 +135,8 @@ class PbOMPL():
         self.robot = robot
         self.robot_id = robot.id
         self.obstacles = obstacles
+        self.goal_state = None
+        self.goal_mat = None
         print(self.obstacles)
 
         self.space = PbStateSpace(robot.num_dim)
@@ -146,14 +150,15 @@ class PbOMPL():
         self.space.setBounds(bounds)
 
         self.ss = og.SimpleSetup(self.space)
-        self.ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.is_state_valid))
+        # self.ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.is_state_valid))
+        self.ss.setStateValidityChecker(ob.StateValidityCheckerFn(self.is_state_valid_new))
         self.si = self.ss.getSpaceInformation()
         # self.si.setStateValidityCheckingResolution(0.005)
         # self.collision_fn = pb_utils.get_collision_fn(self.robot_id, self.robot.joint_idx, self.obstacles, [], True, set(),
         #                                                 custom_limits={}, max_distance=0, allow_collision_links=[])
 
         self.set_obstacles(obstacles)
-        self.set_planner("PRM") # RRT by default
+        self.set_planner("BITstar") # RRT by default
 
     def set_obstacles(self, obstacles):
         self.obstacles = obstacles
@@ -183,6 +188,33 @@ class PbOMPL():
             if pb_ompl_utils.pairwise_collision(body1, body2):
                 # print('body collision', body1, body2)
                 # print(get_body_name(body1), get_body_name(body2))
+                return False
+        return True
+    
+    def is_state_valid_new(self, state):
+        # check the state that near the goal state have appropriate end-effector orientation or not 
+        
+        # check self-collision
+        self.robot.set_state(self.state_to_list(state))
+        for link1, link2 in self.check_link_pairs:
+            if pb_ompl_utils.pairwise_link_collision(self.robot_id, link1, self.robot_id, link2):
+                # print(get_body_name(body), get_link_name(body, link1), get_link_name(body, link2))
+                return False
+
+        # check collision against environment
+        for body1, body2 in self.check_body_pairs:
+            if pb_ompl_utils.pairwise_collision(body1, body2):
+                # print('body collision', body1, body2)
+                # print(get_body_name(body1), get_body_name(body2))
+                return False
+        
+        if self.goal_state is not None:
+            self.robot_id
+            pos, orn = p.getLinkState(self.robot_id, 7)[4:6]
+            cur_mat = np.eye(4)
+            cur_mat[:3, :3] = quat2mat(tf_quat(orn))
+            cur_mat[:3, 3] = pos
+            if pb_ompl_utils.approaching(state, self.goal_state, cur_mat, self.goal_mat):
                 return False
         return True
 
@@ -264,11 +296,13 @@ class PbOMPL():
         self.robot.set_state(orig_robot_state)
         return res, sol_path_list, sol_elbow_pos_list, sol_gripper_pos_list, sol_gripper_orn_list
 
-    def plan(self, goal, allowed_time = DEFAULT_PLANNING_TIME, interpolate_num=INTERPOLATE_NUM):
+    def plan(self, goal, goal_mat = None, allowed_time = DEFAULT_PLANNING_TIME, interpolate_num=INTERPOLATE_NUM):
         '''
         plan a path to gaol from current robot state
         '''
         start = self.robot.get_cur_state()
+        self.goal_state = goal
+        self.goal_mat = goal_mat
         return self.plan_start_goal(start, goal, allowed_time=allowed_time, interpolate_num=interpolate_num)
 
     def execute(self, path, dynamics=False):
