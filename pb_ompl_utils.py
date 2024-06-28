@@ -163,7 +163,8 @@ def approaching(state, goal_state, state_mat, goal_mat):
     dist_vec /= np.linalg.norm(dist_vec)
     # print(f"dist_vec: {dist_vec}")
     if np.linalg.norm(dist_vec) < 0.07:
-        if np.dot(dist_vec, goal_mat[:3, 2]) > -0.1 or np.dot(state_mat[:3, 1], goal_mat[:3, 1]) < 0.3:
+        # if np.dot(dist_vec, goal_mat[:3, 2]) > -0.6 or np.dot(state_mat[:3, 1], goal_mat[:3, 1]) < 0.3:
+        if np.dot(dist_vec, goal_mat[:3, 2]) > -0.6:
             return True
     return False
 
