@@ -137,6 +137,7 @@ class PbOMPL():
         self.obstacles = obstacles
         self.goal_state = None
         self.goal_mat = None
+        self.sim_target_object_id = False
         print(self.obstacles)
 
         self.space = PbStateSpace(robot.num_dim)
@@ -208,9 +209,21 @@ class PbOMPL():
                 # print(get_body_name(body1), get_body_name(body2))
                 return False
         
+        # Check if the sim_object is collide with the obstacle
+        pos, orn = p.getLinkState(self.robot_id, 7)[4:6]
+        target_pos, target_orn = p.multiplyTransforms(
+            pos, orn,
+            self.relative_pos, self.relative_orn
+        )
+        if self.sim_target_object_id is not None:
+            p.resetBasePositionAndOrientation(self.sim_target_object_id, target_pos, target_orn)
+            for obstacle in self.obstacles:
+                if np.linalg.norm(pos - self.goal_mat[:3, 3]) > 0.07 and len(p.getClosestPoints(bodyA=self.sim_target_object_id,
+                                                                                                bodyB=obstacle, distance=0.)) != 0:  # getContactPoints
+                    return False                    
+        # Check the config's gripper is pointing to the target or not
         if self.goal_state is not None:
             self.robot_id
-            pos, orn = p.getLinkState(self.robot_id, 7)[4:6]
             cur_mat = np.eye(4)
             cur_mat[:3, :3] = quat2mat(tf_quat(orn))
             cur_mat[:3, 3] = pos
@@ -296,13 +309,21 @@ class PbOMPL():
         self.robot.set_state(orig_robot_state)
         return res, sol_path_list, sol_elbow_pos_list, sol_gripper_pos_list, sol_gripper_orn_list
 
-    def plan(self, goal, goal_mat = None, allowed_time = DEFAULT_PLANNING_TIME, interpolate_num=INTERPOLATE_NUM):
+    def plan(self, goal, goal_mat = None,
+             allowed_time = DEFAULT_PLANNING_TIME,
+             interpolate_num=INTERPOLATE_NUM,
+             sim_target_object_id=False,
+             relative_pos=None,
+             relative_orn=None):
         '''
         plan a path to gaol from current robot state
         '''
         start = self.robot.get_cur_state()
         self.goal_state = goal
         self.goal_mat = goal_mat
+        self.sim_target_object_id = sim_target_object_id
+        self.relative_pos = relative_pos
+        self.relative_orn = relative_orn
         return self.plan_start_goal(start, goal, allowed_time=allowed_time, interpolate_num=interpolate_num)
 
     def execute(self, path, dynamics=False):
