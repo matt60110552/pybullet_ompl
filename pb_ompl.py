@@ -137,7 +137,7 @@ class PbOMPL():
         self.obstacles = obstacles
         self.goal_state = None
         self.goal_mat = None
-        self.sim_target_object_id = False
+        self.sim_target_object_id = None
         print(self.obstacles)
 
         self.space = PbStateSpace(robot.num_dim)
@@ -209,18 +209,18 @@ class PbOMPL():
                 # print(get_body_name(body1), get_body_name(body2))
                 return False
         
-        # Check if the sim_object is collide with the obstacle
         pos, orn = p.getLinkState(self.robot_id, 7)[4:6]
-        target_pos, target_orn = p.multiplyTransforms(
-            pos, orn,
-            self.relative_pos, self.relative_orn
-        )
         if self.sim_target_object_id is not None:
+            # Check if the sim_object is collide with the obstacle
+            target_pos, target_orn = p.multiplyTransforms(
+                pos, orn,
+                self.relative_pos, self.relative_orn
+            )
             p.resetBasePositionAndOrientation(self.sim_target_object_id, target_pos, target_orn)
             for obstacle in self.obstacles:
                 if np.linalg.norm(pos - self.goal_mat[:3, 3]) > 0.07 and len(p.getClosestPoints(bodyA=self.sim_target_object_id,
                                                                                                 bodyB=obstacle, distance=0.)) != 0:  # getContactPoints
-                    return False                    
+                    return False
         # Check the config's gripper is pointing to the target or not
         if self.goal_state is not None:
             self.robot_id
@@ -312,7 +312,7 @@ class PbOMPL():
     def plan(self, goal, goal_mat = None,
              allowed_time = DEFAULT_PLANNING_TIME,
              interpolate_num=INTERPOLATE_NUM,
-             sim_target_object_id=False,
+             sim_target_object_id=None,
              relative_pos=None,
              relative_orn=None):
         '''
